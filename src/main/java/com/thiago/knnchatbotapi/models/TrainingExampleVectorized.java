@@ -1,4 +1,4 @@
 package com.thiago.knnchatbotapi.models;
 
-public class TrainingExampleVectorized {
+public record TrainingExampleVectorized( TrainingExample example, double[] vector ) {
 }
