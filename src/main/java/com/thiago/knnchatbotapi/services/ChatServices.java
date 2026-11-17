@@ -1,5 +1,6 @@
 package com.thiago.knnchatbotapi.services;
 
+import com.google.genai.errors.ServerException;
 import com.thiago.knnchatbotapi.data.ChatDataset;
 import com.thiago.knnchatbotapi.models.SimilarityResult;
 import com.thiago.knnchatbotapi.models.TrainingExample;
@@ -14,6 +15,7 @@ public class ChatServices {
     private final VectorizerService vectorizer;
     private final List<TrainingExampleVectorized> vectorizedExamples;
     private final KnnService knnService = new KnnService();
+    private final GeminiService geminiService;
 
     public String answer(String message) {
         double[] questionVector = vectorizer.vectorize(message);
@@ -21,7 +23,7 @@ public class ChatServices {
         List<SimilarityResult> matches = knnService.findNearest(
                 questionVector,
                 vectorizedExamples,
-                1
+                5
         );
 
         SimilarityResult bestMatch = matches.getFirst();
@@ -31,10 +33,25 @@ public class ChatServices {
                     + "Posso ajudar com temas de estruturas de dados, algoritmos e Java.";
         }
 
-        return bestMatch.example().example().answer();
+        String context = matches.stream()
+                .map(match -> """
+                Pergunta: %s
+                Resposta: %s
+                """.formatted(
+                        match.example().example().question(),
+                        match.example().example().answer()
+                ))
+                .collect(java.util.stream.Collectors.joining("\n---\n"));
+
+        try {
+            return geminiService.answer(message, context);
+        } catch (ServerException exception) {
+            return bestMatch.example().example().answer();
+        }
     }
 
-    public ChatServices() {
+    public ChatServices( GeminiService geminiService ) {
+        this.geminiService = geminiService;
         ChatDataset dataset = new ChatDataset();
 
         TextNormalizer normalizer = new TextNormalizer();
